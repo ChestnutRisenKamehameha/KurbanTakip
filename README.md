@@ -18,7 +18,7 @@ Yerel (local) organizasyonlar, çiftlikler ve dernekler için geliştirilmiş, y
 
 ## Kurulum ve Kullanım
 **Son Kullanıcılar İçin (Önerilen):**
-[Releases](https://github.com/ChestnutRisenKamehameha/KurbanTakip/releases/tag/v2.1.0) sayfasından en güncel `KurbanTakip_Kurulum.exe` dosyasını indirin ve kurun. Harici bir programa veya internet bağlantısına ihtiyaç duymaz.
+[Releases](https://github.com/ChestnutRisenKamehameha/KurbanTakip/releases) sayfasından en güncel `KurbanTakip_Kurulum.exe` dosyasını indirin ve kurun. Harici bir programa veya internet bağlantısına ihtiyaç duymaz.
 
 **Geliştiriciler İçin (Development Setup):**
 1. Repoyu klonlayın: `git clone https://github.com/ChestnutRisenKamehameha/KurbanTakip.git`
