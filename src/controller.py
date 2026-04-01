@@ -1,11 +1,11 @@
 """
-controller.py — V2.1 Business-logic layer.
+controller.py — V2.2 Business-logic layer.
 
-V2.1 changes
+V2.2 changes
 -------------
-* ``share_fraction`` flows through staging and normalisation.
-* New ``add_share_to_animal`` / ``remove_share_from_animal`` methods
-  with phone validation and duplicate checks.
+* ``is_paid`` → ``paid_amount`` (Decimal) in all staging and CRUD flows.
+* ``toggle_payment`` replaced by ``update_paid_amount``.
+* New ``get_dashboard_stats()`` pass-through.
 """
 
 from __future__ import annotations
@@ -18,7 +18,13 @@ from typing import List, Optional, Tuple
 import phonenumbers
 
 from database import KurbanRepository
-from models import AnimalRecord, PaginatedResult, StagedAnimal, StagedShareholderEntry
+from models import (
+    AnimalRecord,
+    DashboardStats,
+    PaginatedResult,
+    StagedAnimal,
+    StagedShareholderEntry,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -28,7 +34,6 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 def validate_phone(raw_number: str, region: str = "TR") -> Tuple[bool, str, str]:
-    """Return ``(valid, error_msg, e164_string)``."""
     try:
         parsed = phonenumbers.parse(raw_number, region)
     except phonenumbers.NumberParseException as exc:
@@ -46,7 +51,6 @@ def validate_phone(raw_number: str, region: str = "TR") -> Tuple[bool, str, str]
 # ---------------------------------------------------------------------------
 
 class KurbanController:
-    """Mediates between the View (GUI) and the Model (Repository)."""
 
     def __init__(self, repo: KurbanRepository) -> None:
         self._repo = repo
@@ -88,7 +92,6 @@ class KurbanController:
                 ok, err, e164 = validate_phone(raw, None)  # type: ignore[arg-type]
             else:
                 ok, err, e164 = validate_phone(raw, "TR")
-
             if not ok:
                 return False, f"Hissedar '{name}': {err}"
 
@@ -99,10 +102,14 @@ class KurbanController:
             if not (1 <= sh.share_fraction <= 7):
                 return False, f"Hissedar '{name}': Pay 1–7 arasında olmalıdır."
 
+            if sh.paid_amount < 0:
+                return False, f"Hissedar '{name}': Ödeme tutarı negatif olamaz."
+
             normalised.append(
                 StagedShareholderEntry(
                     phone=e164, name=name,
-                    is_paid=sh.is_paid, share_fraction=sh.share_fraction,
+                    paid_amount=sh.paid_amount,
+                    share_fraction=sh.share_fraction,
                 )
             )
 
@@ -153,17 +160,21 @@ class KurbanController:
     ) -> PaginatedResult:
         return self._repo.search_paginated(query, page, per_page)
 
-    # ── Payment toggle ───────────────────────────────────────────────────
+    # ── Payment (V2.2) ───────────────────────────────────────────────────
 
-    def toggle_payment(
-        self, animal_id: int, phone: str, new_state: bool
+    def update_paid_amount(
+        self, animal_id: int, phone: str, paid_amount: Decimal
     ) -> Tuple[bool, str]:
+        if paid_amount < 0:
+            return False, "Ödeme tutarı negatif olamaz."
         try:
-            self._repo.update_payment_status(animal_id, phone, new_state)
-            return True, "Ödeme durumu güncellendi."
+            self._repo.update_paid_amount(animal_id, phone, paid_amount)
+            return True, "Ödeme tutarı güncellendi."
         except Exception as exc:
-            logger.exception("Payment toggle failed for animal=%d phone=%s", animal_id, phone)
-            return False, f"Veritabanı hatası — değişiklik geri alındı: {exc}"
+            logger.exception(
+                "Payment update failed for animal=%d phone=%s", animal_id, phone
+            )
+            return False, f"Veritabanı hatası: {exc}"
 
     # ── Animal update / delete ───────────────────────────────────────────
 
@@ -189,22 +200,20 @@ class KurbanController:
             logger.exception("Animal delete failed for id=%d", animal_id)
             return False, f"Silme hatası: {exc}"
 
-    # ── V2.1 — Share-level CRUD ──────────────────────────────────────────
+    # ── Share-level CRUD ─────────────────────────────────────────────────
 
     def add_share_to_animal(
         self,
         animal_id: int,
         raw_phone: str,
         name: str,
-        is_paid: bool,
+        paid_amount: Decimal,
         share_fraction: int,
         region: str = "TR",
     ) -> Tuple[bool, str]:
-        """Validate then add a shareholder to an existing animal."""
         name = name.strip()
         if not name:
             return False, "Hissedar adı boş bırakılamaz."
-
         raw = raw_phone.strip()
         if not raw:
             return False, "Telefon numarası boş."
@@ -218,9 +227,13 @@ class KurbanController:
 
         if not (1 <= share_fraction <= 7):
             return False, "Pay 1–7 arasında olmalıdır."
+        if paid_amount < 0:
+            return False, "Ödeme tutarı negatif olamaz."
 
         try:
-            self._repo.add_share_to_animal(animal_id, e164, name, is_paid, share_fraction)
+            self._repo.add_share_to_animal(
+                animal_id, e164, name, paid_amount, share_fraction
+            )
             return True, f"Hissedar eklendi: {e164}"
         except Exception as exc:
             logger.exception("Add share failed: animal=%d phone=%s", animal_id, e164)
@@ -236,7 +249,12 @@ class KurbanController:
             logger.exception("Remove share failed: animal=%d phone=%s", animal_id, phone)
             return False, f"Hata: {exc}"
 
-    # ── Export data ──────────────────────────────────────────────────────
+    # ── Dashboard ────────────────────────────────────────────────────────
+
+    def get_dashboard_stats(self) -> DashboardStats:
+        return self._repo.get_dashboard_stats()
+
+    # ── Export ────────────────────────────────────────────────────────────
 
     def get_all_for_export(self) -> List[AnimalRecord]:
         return self._repo.get_all_for_export()
