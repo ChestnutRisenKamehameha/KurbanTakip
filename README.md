@@ -17,10 +17,26 @@ Yerel (local) organizasyonlar, çiftlikler ve dernekler için geliştirilmiş, y
 * **Derleme/Dağıtım:** Nuitka & Inno Setup
 
 ## Kurulum ve Kullanım
+
 **Son Kullanıcılar İçin (Önerilen):**
 [Releases](https://github.com/ChestnutRisenKamehameha/KurbanTakip/releases) sayfasından en güncel `KurbanTakip_Kurulum.exe` dosyasını indirin ve kurun. Harici bir programa veya internet bağlantısına ihtiyaç duymaz.
 
 **Geliştiriciler İçin (Development Setup):**
-1. Repoyu klonlayın: `git clone https://github.com/ChestnutRisenKamehameha/KurbanTakip.git`
-2. Gereksinimleri yükleyin: `pip install -r requirements.txt`
-3. Uygulamayı başlatın: `python src/main.py`
+Proje, bağımlılık ve ortam yönetimi için `uv` paket yöneticisini kullanmaktadır.
+
+1. **Repoyu klonlayın:**
+   ```bash
+   git clone [https://github.com/ChestnutRisenKamehameha/KurbanTakip.git](https://github.com/ChestnutRisenKamehameha/KurbanTakip.git)
+   cd KurbanTakip
+2. **Gereksinimleri yükleyin:**
+   ```bash
+   uv add --dev nuitka zstandard
+   ```
+3. **Uygulamayı başlatın:**
+   ```bash
+   uv run main.py
+   ```
+4. **Dilerseniz uygulamayı derleyin:**
+   ```bash
+   uv run nuitka --standalone --plugin-enable=pyqt6 --windows-disable-console main.py
+   ```
